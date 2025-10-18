@@ -1,19 +1,20 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Map from "./components/Map";
 import MissionCard from "./components/MissionCard";
 import "./App.css";
 
-interface MarkerData {
+export interface TrackPointsList {
   lat: number[];
   lng: number[];
   color?: string;
 }
 
-interface Mission {
+export interface Mission {
   id: string;
   fileName: string;
   color: string;
-  markers: MarkerData[];
+  trackPoints: TrackPointsList;
+  location?: string;
 }
 
 function App() {
@@ -44,6 +45,26 @@ function App() {
     return colors[Math.floor(Math.random() * colors.length)];
   };
 
+  // Función para obtener información de ubicación usando Nominatim
+  const getLocationInfo = async (lat: number, lng: number): Promise<string> => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=es`
+      );
+      const data = await response.json();
+
+      if (data && data.display_name) {
+        // Extraer información relevante de la respuesta
+        const parts = data.display_name.split(", ");
+        return parts.slice(0, 3).join(", "); // Tomar solo las primeras 3 partes
+      }
+      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    } catch (error) {
+      console.error("Error obteniendo ubicación:", error);
+      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
+  };
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -62,30 +83,22 @@ function App() {
         id: missionId,
         fileName: file.name,
         color: missionColor,
-        markers: [],
+        trackPoints: { lat: [], lng: [] },
       };
 
-      setMissions((prevMissions) => [...prevMissions, newMission]);
-
       setSelectedMissionId(missionId);
-
+      let gpsData: any;
       const worker = new Worker("parser.js", { type: "module" });
 
       worker.onmessage = (event) => {
-        if (event.data.messageType === "GPS") {
-          setMissions((prevMissions) =>
-            prevMissions.map((mission) => ({
-              ...mission,
-              markers: [
-                ...mission.markers,
-                {
-                  lat: event.data.messageList.Lat,
-                  lng: event.data.messageList.Lng,
-                  color: mission.color,
-                },
-              ],
-            }))
-          );
+        console.log("event:", event.data);
+
+        if (
+          event.data.messageType === "GPS[0]" ||
+          event.data.messageType === "GPS"
+        ) {
+          gpsData = event.data.messageList;
+          console.log("gpsData:", gpsData);
         }
 
         if (event.data.hasOwnProperty("percentage")) {
@@ -102,18 +115,33 @@ function App() {
         } else if (event.data.hasOwnProperty("messageType")) {
           //console.log(`got list of ${event.data.messageType}:`);
           //console.log(event.data.messageList);
-        } else if (
-          event.data.hasOwnProperty("messageType") &&
-          event.data.messageType === "GPS"
-        ) {
-          console.log(event.data.messageList);
-
-          //
         } else if (event.data.hasOwnProperty("files")) {
           //console.log("got files:");
           //console.log(event.data.files);
         } else if (event.data.hasOwnProperty("messagesDoneLoading")) {
-          console.log("messages finished loading");
+          console.log("[aec] messages finished loading: ", gpsData);
+
+          if (gpsData) {
+            // Obtener las coordenadas del primer punto para la ubicación
+            const firstLat = (gpsData as any).Lat[0] / 10 ** 7;
+            const firstLng = (gpsData as any).Lng[0] / 10 ** 7;
+
+            // Obtener información de ubicación
+            getLocationInfo(firstLat, firstLng).then((location) => {
+              setMissions((prevMissions) => [
+                ...prevMissions,
+                {
+                  ...newMission,
+                  trackPoints: {
+                    lat: (gpsData as any).Lat,
+                    lng: (gpsData as any).Lng,
+                    color: newMission.color,
+                  },
+                  location: location,
+                },
+              ]);
+            });
+          }
         }
       };
       let reader = new FileReader();
@@ -131,14 +159,17 @@ function App() {
     }
   };
 
-  // Obtener todos los marcadores de todas las misiones
-  const allMarkers = missions.flatMap((mission) =>
-    mission.markers.map((marker) => ({
-      lat: marker.lat[0] / 10 ** 7,
-      lng: marker.lng[0] / 10 ** 7,
-      color: marker.color ?? "blue",
-    }))
+  const allMarkers = useMemo(
+    () =>
+      missions.map((mission) => ({
+        lat: mission.trackPoints.lat[0] / 10 ** 7 || 0,
+        lng: mission.trackPoints.lng[0] / 10 ** 7 || 0,
+        color: mission.color,
+      })),
+    [missions]
   );
+
+  console.log("[aec]allMarkers:", missions);
 
   return (
     <div className="app">
@@ -163,7 +194,8 @@ function App() {
               key={mission.id}
               fileName={mission.fileName}
               color={mission.color}
-              markerCount={mission.markers.length}
+              trackPoints={mission.trackPoints}
+              location={mission.location}
               isSelected={selectedMissionId === mission.id}
               onSelect={() => setSelectedMissionId(mission.id)}
             />

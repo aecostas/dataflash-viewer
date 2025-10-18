@@ -1,9 +1,11 @@
+import type { TrackPointsList } from "../App";
 import "./MissionCard.css";
 
 interface MissionCardProps {
   fileName: string;
   color: string;
-  markerCount: number;
+  trackPoints: TrackPointsList;
+  location?: string;
   onSelect: () => void;
   isSelected?: boolean;
 }
@@ -11,10 +13,12 @@ interface MissionCardProps {
 const MissionCard = ({
   fileName,
   color,
-  markerCount,
+  trackPoints,
+  location,
   onSelect,
   isSelected = false,
 }: MissionCardProps) => {
+  console.log("trackPoints:", trackPoints);
   return (
     <div
       className={`mission-card ${isSelected ? "selected" : ""}`}
@@ -28,8 +32,15 @@ const MissionCard = ({
         <span className="mission-file-name">{fileName}</span>
       </div>
       <div className="mission-card-info">
-        <span className="marker-count">{markerCount} puntos GPS</span>
+        <span className="marker-count">
+          {trackPoints.lat.length} puntos GPS
+        </span>
       </div>
+      {location && (
+        <div className="mission-location">
+          <span className="location-text">{location}</span>
+        </div>
+      )}
     </div>
   );
 };
