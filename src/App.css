@@ -50,6 +50,32 @@
   padding: 20px;
   background-color: #f5f5f5;
   border-right: 1px solid #ddd;
+  overflow-y: auto;
+}
+
+.file-input-section {
+  margin-bottom: 20px;
+}
+
+.file-input-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #333;
+}
+
+.file-input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.missions-section h3 {
+  margin: 0 0 12px 0;
+  color: #333;
+  font-size: 16px;
 }
 
 .main {

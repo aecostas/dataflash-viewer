@@ -1,43 +1,48 @@
-import { useState, useEffect, useRef } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import { useState } from "react";
+import Map from "./components/Map";
+import MissionCard from "./components/MissionCard";
 import "./App.css";
 
+interface MarkerData {
+  lat: number[];
+  lng: number[];
+  color?: string;
+}
+
+interface Mission {
+  id: string;
+  fileName: string;
+  color: string;
+  markers: MarkerData[];
+}
+
 function App() {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<L.Map | null>(null);
+  const [, setSelectedFile] = useState<File | null>(null);
+  const [missions, setMissions] = useState<Mission[]>([]);
+  const [selectedMissionId, setSelectedMissionId] = useState<string | null>(
+    null
+  );
 
-  useEffect(() => {
-    if (mapRef.current && !mapInstanceRef.current) {
-      // Fix para los iconos de Leaflet
-      delete (L.Icon.Default.prototype as any)._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl:
-          "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-        iconUrl:
-          "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-        shadowUrl:
-          "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-      });
-
-      // Inicializar el mapa
-      const map = L.map(mapRef.current).setView([40.4168, -3.7038], 6); // Madrid por defecto
-
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors",
-      }).addTo(map);
-
-      mapInstanceRef.current = map;
-    }
-
-    return () => {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
-    };
-  }, []);
+  const generateRandomColor = (): string => {
+    const colors = [
+      "#FF6B6B",
+      "#4ECDC4",
+      "#45B7D1",
+      "#96CEB4",
+      "#FFEAA7",
+      "#DDA0DD",
+      "#98D8C8",
+      "#F7DC6F",
+      "#BB8FCE",
+      "#85C1E9",
+      "#F8C471",
+      "#82E0AA",
+      "#F1948A",
+      "#85C1E9",
+      "#D7BDE2",
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -51,24 +56,36 @@ function App() {
         "bytes"
       );
 
+      const missionId = Date.now().toString();
+      const missionColor = generateRandomColor();
+      const newMission: Mission = {
+        id: missionId,
+        fileName: file.name,
+        color: missionColor,
+        markers: [],
+      };
+
+      setMissions((prevMissions) => [...prevMissions, newMission]);
+
+      setSelectedMissionId(missionId);
+
       const worker = new Worker("parser.js", { type: "module" });
 
       worker.onmessage = (event) => {
         if (event.data.messageType === "GPS") {
-          console.log(
-            "[GPS]",
-            event.data.messageList.Lat[0],
-            event.data.messageList.Lng[0]
+          setMissions((prevMissions) =>
+            prevMissions.map((mission) => ({
+              ...mission,
+              markers: [
+                ...mission.markers,
+                {
+                  lat: event.data.messageList.Lat,
+                  lng: event.data.messageList.Lng,
+                  color: mission.color,
+                },
+              ],
+            }))
           );
-
-          const coords = [
-            parseFloat(event.data.messageList.Lat[0]) / 10 ** 7,
-            parseFloat(event.data.messageList.Lng[0]) / 10 ** 7,
-          ];
-
-          if (mapInstanceRef.current) {
-            mapInstanceRef.current.setView([coords[0], coords[1]], 15);
-          }
         }
 
         if (event.data.hasOwnProperty("percentage")) {
@@ -100,7 +117,7 @@ function App() {
         }
       };
       let reader = new FileReader();
-      reader.onload = function (e) {
+      reader.onload = function () {
         let arrayBuffer = new Uint8Array(reader.result as ArrayBuffer);
         console.log(arrayBuffer);
         let data = reader.result;
@@ -114,18 +131,47 @@ function App() {
     }
   };
 
+  // Obtener todos los marcadores de todas las misiones
+  const allMarkers = missions.flatMap((mission) =>
+    mission.markers.map((marker) => ({
+      lat: marker.lat[0] / 10 ** 7,
+      lng: marker.lng[0] / 10 ** 7,
+      color: marker.color ?? "blue",
+    }))
+  );
+
   return (
     <div className="app">
       <div className="sidepanel">
-        <input
-          type="file"
-          id="fileInput"
-          accept=".bin"
-          onChange={handleFileChange}
-        />
+        <div className="file-input-section">
+          <label htmlFor="fileInput" className="file-input-label">
+            Seleccionar archivo .bin
+          </label>
+          <input
+            type="file"
+            id="fileInput"
+            accept=".bin"
+            onChange={handleFileChange}
+            className="file-input"
+          />
+        </div>
+
+        <div className="missions-section">
+          <h3>Misiones</h3>
+          {missions.map((mission) => (
+            <MissionCard
+              key={mission.id}
+              fileName={mission.fileName}
+              color={mission.color}
+              markerCount={mission.markers.length}
+              isSelected={selectedMissionId === mission.id}
+              onSelect={() => setSelectedMissionId(mission.id)}
+            />
+          ))}
+        </div>
       </div>
       <div className="main">
-        <div className="map" ref={mapRef}></div>
+        <Map markers={allMarkers} className="map" />
       </div>
     </div>
   );
