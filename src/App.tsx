@@ -20,9 +20,6 @@ export interface Mission {
 function App() {
   const [, setSelectedFile] = useState<File | null>(null);
   const [missions, setMissions] = useState<Mission[]>([]);
-  const [selectedMissionId, setSelectedMissionId] = useState<string | null>(
-    null
-  );
 
   const generateRandomColor = (): string => {
     const colors = [
@@ -86,7 +83,7 @@ function App() {
         trackPoints: { lat: [], lng: [] },
       };
 
-      setSelectedMissionId(missionId);
+      //setSelectedMissionId(missionId);
       let gpsData: any;
       const worker = new Worker("parser.js", { type: "module" });
 
@@ -196,8 +193,8 @@ function App() {
               color={mission.color}
               trackPoints={mission.trackPoints}
               location={mission.location}
-              isSelected={selectedMissionId === mission.id}
-              onSelect={() => setSelectedMissionId(mission.id)}
+              isSelected={false}
+              onSelect={() => {}}
             />
           ))}
         </div>
