@@ -3,6 +3,8 @@ import maplibregl, {
   Map as MapLibreMap,
   Marker as MapLibreMarker,
 } from "maplibre-gl";
+import * as DeckMapbox from "@deck.gl/mapbox";
+import { PathLayer } from "@deck.gl/layers";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 interface MarkerData {
@@ -15,90 +17,96 @@ interface MapProps {
   defaultCoords?: [number, number];
   markers?: MarkerData[];
   className?: string;
+  selectedTrack?: { lat: number; lng: number; alt?: number }[];
 }
 
 const Map = ({
   defaultCoords = [40.4168, -3.7038],
   markers = [],
   className = "",
+  selectedTrack,
 }: MapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<MapLibreMarker[]>([]);
+  const trackSourceId = useRef<string>("selected-track-source");
+  const trackLayerId = useRef<string>("selected-track-layer");
+  const deckOverlayRef = useRef<any>(null);
 
   useEffect(() => {
     if (mapRef.current && !mapInstanceRef.current) {
-      console.log("mapRef.current", mapRef.current);
-      const maptilerKey = import.meta.env.VITE_MAPTILER_KEY as
-        | string
-        | undefined;
+      const init = async () => {
+        const maptilerKey = import.meta.env.VITE_MAPTILER_KEY as
+          | string
+          | undefined;
 
-      const osm2DStyle: any = {
-        version: 8,
-        sources: {
-          osm: {
-            type: "raster",
-            tiles: [
-              "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
-              "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
-              "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
-            ],
-            tileSize: 256,
-            attribution: "© OpenStreetMap contributors",
-          },
-        },
-        layers: [
-          {
-            id: "osm",
-            type: "raster",
-            source: "osm",
-            minzoom: 0,
-            maxzoom: 19,
-          },
-        ],
-      };
-
-      const style: any = maptilerKey
-        ? `https://api.maptiler.com/maps/hybrid/style.json?key=${maptilerKey}`
-        : osm2DStyle;
-
-      const map = new maplibregl.Map({
-        container: mapRef.current,
-        style,
-        center: [defaultCoords[1], defaultCoords[0]], // [lng, lat]
-        zoom: 6,
-        maxZoom: 14,
-      });
-
-      if (maptilerKey) {
-        map.on("load", () => {
-          // Add MapTiler Terrain DEM source
-          if (!map.getSource("terrain")) {
-            map.addSource("terrain", {
-              type: "raster-dem",
-              url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${maptilerKey}`,
+        const osm2DStyle: any = {
+          version: 8,
+          sources: {
+            osm: {
+              type: "raster",
+              tiles: [
+                "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+                "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
+              ],
               tileSize: 256,
-            } as any);
-          }
+              attribution: "© OpenStreetMap contributors",
+            },
+          },
+          layers: [
+            {
+              id: "osm",
+              type: "raster",
+              source: "osm",
+              minzoom: 0,
+              maxzoom: 19,
+            },
+          ],
+        };
 
-          // Enable terrain with a slight exaggeration
-          map.setTerrain({ source: "terrain", exaggeration: 1.2 } as any);
-
-          // Add a sky layer for better 3D visualization
-          if (!map.getLayer("sky")) {
-            map.addLayer({
-              id: "sky",
-              type: "sky",
-              paint: {
-                "sky-type": "atmosphere",
-                "sky-atmosphere-sun": [0.0, 0.0],
-                "sky-atmosphere-sun-intensity": 15,
-              },
-            } as any);
+        let style: any = osm2DStyle;
+        if (maptilerKey) {
+          try {
+            const resp = await fetch(
+              `https://api.maptiler.com/maps/hybrid/style.json?key=${maptilerKey}`
+            );
+            const remoteStyle = await resp.json();
+            // Remove any sky layers from style
+            remoteStyle.layers = (remoteStyle.layers || []).filter(
+              (l: any) => l.type !== "sky" && l.id !== "sky"
+            );
+            // Some styles may include a sky source; keep sources as-is
+            style = remoteStyle;
+          } catch (e) {
+            // Fallback silently to OSM style on any error
+            style = osm2DStyle;
           }
+        }
+
+        const map = new maplibregl.Map({
+          container: mapRef.current as HTMLDivElement,
+          style,
+          center: [defaultCoords[1], defaultCoords[0]], // [lng, lat]
+          zoom: 6,
         });
-      }
-      mapInstanceRef.current = map;
+
+        if (maptilerKey) {
+          map.on("load", () => {
+            if (!map.getSource("terrain")) {
+              map.addSource("terrain", {
+                type: "raster-dem",
+                url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${maptilerKey}`,
+                tileSize: 256,
+              } as any);
+            }
+            map.setTerrain({ source: "terrain", exaggeration: 1.2 } as any);
+          });
+        }
+
+        mapInstanceRef.current = map;
+      };
+      void init();
     }
 
     return () => {
@@ -137,7 +145,7 @@ const Map = ({
     });
 
     if (markers.length > 0) {
-      const MAX_FIT_ZOOM = 11;
+      const MAX_FIT_ZOOM = 15;
       if (markers.length === 1) {
         const { lat, lng } = markers[0];
         mapInstanceRef.current.easeTo({
@@ -174,6 +182,113 @@ const Map = ({
       }
     }
   }, [markers]);
+
+  // Efecto para dibujar la pista seleccionada
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    // Si no hay track, eliminar capa y fuente si existen
+    if (!selectedTrack || selectedTrack.length === 0) {
+      if (map.getLayer(trackLayerId.current)) {
+        map.removeLayer(trackLayerId.current);
+      }
+      if (map.getSource(trackSourceId.current)) {
+        map.removeSource(trackSourceId.current);
+      }
+      if (deckOverlayRef.current) {
+        try {
+          deckOverlayRef.current.setProps({ layers: [] });
+          map.removeControl(deckOverlayRef.current);
+        } catch (_) {}
+        deckOverlayRef.current = null;
+      }
+      return;
+    }
+
+    const lineCoords = selectedTrack.map(
+      (p) => [p.lng, p.lat, p.alt] as [number, number, number]
+    ) as [number, number, number][];
+
+    const geojson = {
+      type: "FeatureCollection",
+      features: [
+        {
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: lineCoords,
+          },
+          properties: {},
+        },
+      ],
+    } as any;
+
+    const addOrUpdate = () => {
+      if (map.getSource(trackSourceId.current)) {
+        const src = map.getSource(trackSourceId.current) as any;
+        src.setData(geojson);
+      } else {
+        map.addSource(trackSourceId.current, {
+          type: "geojson",
+          data: geojson,
+        } as any);
+      }
+
+      if (!map.getLayer(trackLayerId.current)) {
+        map.addLayer({
+          id: trackLayerId.current,
+          type: "line",
+          source: trackSourceId.current,
+          paint: {
+            "line-color": "#ff5500",
+            "line-width": 3,
+          },
+        } as any);
+      }
+
+      // Añadir overlay Deck.gl con altitud si hay datos de altura
+      const hasAltitude = selectedTrack.some((p) => typeof p.alt === "number");
+      const pathLayer = new PathLayer({
+        id: "deckgl-selected-track-path",
+        data: hasAltitude ? [selectedTrack] : [],
+        getPath: (d: any) => d.map((p: any) => [p.lng, p.lat, p.alt || 0]),
+        getWidth: 4,
+        widthUnits: "pixels",
+        getColor: [255, 85, 0, 255],
+        parameters: { depthTest: true },
+      } as any);
+
+      const OverlayClass = (DeckMapbox as any).MapboxOverlay;
+      if (hasAltitude) {
+        if (!deckOverlayRef.current) {
+          deckOverlayRef.current = new OverlayClass({ layers: [pathLayer] });
+          map.addControl(deckOverlayRef.current);
+        } else {
+          deckOverlayRef.current.setProps({ layers: [pathLayer] });
+        }
+      } else if (deckOverlayRef.current) {
+        try {
+          deckOverlayRef.current.setProps({ layers: [] });
+          map.removeControl(deckOverlayRef.current);
+        } catch (_) {}
+        deckOverlayRef.current = null;
+      }
+
+      // Ajustar vista a la pista con límite de zoom
+      const bounds = new maplibregl.LngLatBounds();
+      lineCoords.forEach(([lng, lat]) =>
+        bounds.extend([lng, lat] as [number, number])
+      );
+      map.fitBounds(bounds, { padding: 40 });
+    };
+
+    if (!map.isStyleLoaded()) {
+      map.once("load", addOrUpdate);
+    } else {
+      addOrUpdate();
+    }
+  }, [selectedTrack]);
 
   return <div ref={mapRef} className={className} />;
 };

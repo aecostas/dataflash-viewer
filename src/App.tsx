@@ -8,6 +8,7 @@ export interface TrackPointsList {
   lat: number[];
   lng: number[];
   color?: string;
+  alt?: number[];
 }
 
 export interface Mission {
@@ -22,6 +23,9 @@ export interface Mission {
 function App() {
   const [, setSelectedFile] = useState<File | null>(null);
   const [missions, setMissions] = useState<Mission[]>([]);
+  const [selectedMissionId, setSelectedMissionId] = useState<string | null>(
+    null
+  );
 
   const generateRandomColor = (): string => {
     const colors = [
@@ -95,11 +99,16 @@ function App() {
                 foundMission.trackPoints = {
                   lat: (gpsData as any).Lat,
                   lng: (gpsData as any).Lng,
+                  alt:
+                    (gpsData as any).Alt ??
+                    (gpsData as any).AltMSL ??
+                    (gpsData as any).Altitude,
                   color: newMission.color,
                 };
                 foundMission.location = location;
                 foundMission.processing = false;
 
+                console.log("foundMission:", foundMission);
                 return [...prevMissions];
               });
             });
@@ -134,6 +143,24 @@ function App() {
 
   console.log("[aec]allMarkers:", missions);
 
+  const selectedTrack = useMemo(() => {
+    if (!selectedMissionId) return undefined;
+    const mission = missions.find((m) => m.id === selectedMissionId);
+    if (!mission) return undefined;
+    const latArr = mission.trackPoints.lat || [];
+    const lngArr = mission.trackPoints.lng || [];
+    const altArr = mission.trackPoints.alt || [];
+    const length = Math.min(latArr.length, lngArr.length);
+    const result: { lat: number; lng: number; alt?: number }[] = [];
+    for (let i = 0; i < length; i++) {
+      const lat = latArr[i] / 10 ** 7;
+      const lng = lngArr[i] / 10 ** 7;
+      const alt = altArr[i];
+      result.push(alt !== undefined ? { lat, lng, alt } : { lat, lng });
+    }
+    return result;
+  }, [missions, selectedMissionId]);
+
   return (
     <div className="app">
       <div className="sidepanel">
@@ -161,14 +188,18 @@ function App() {
               trackPoints={mission.trackPoints}
               location={mission.location}
               processing={mission.processing}
-              isSelected={false}
-              onSelect={() => {}}
+              isSelected={selectedMissionId === mission.id}
+              onSelect={() => setSelectedMissionId(mission.id)}
             />
           ))}
         </div>
       </div>
       <div className="main">
-        <Map markers={allMarkers} className="map" />
+        <Map
+          markers={allMarkers}
+          className="map"
+          selectedTrack={selectedTrack}
+        />
       </div>
     </div>
   );
