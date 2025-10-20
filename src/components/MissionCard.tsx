@@ -5,6 +5,7 @@ interface MissionCardProps {
   fileName: string;
   color: string;
   trackPoints: TrackPointsList;
+  processing?: boolean;
   location?: string;
   onSelect: () => void;
   isSelected?: boolean;
@@ -16,9 +17,9 @@ const MissionCard = ({
   trackPoints,
   location,
   onSelect,
+  processing,
   isSelected = false,
 }: MissionCardProps) => {
-  console.log("trackPoints:", trackPoints);
   return (
     <div
       className={`mission-card ${isSelected ? "selected" : ""}`}
@@ -30,6 +31,12 @@ const MissionCard = ({
           style={{ backgroundColor: color }}
         />
         <span className="mission-file-name">{fileName}</span>
+        {processing && (
+          <i
+            className="fa-solid fa-spinner fa-spin loading-icon"
+            aria-label="Procesando"
+          />
+        )}
       </div>
       <div className="mission-card-info">
         <span className="marker-count">

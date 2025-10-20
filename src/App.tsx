@@ -16,6 +16,7 @@ export interface Mission {
   color: string;
   trackPoints: TrackPointsList;
   location?: string;
+  processing?: boolean;
 }
 
 function App() {
@@ -62,8 +63,10 @@ function App() {
         fileName: file.name,
         color: missionColor,
         trackPoints: { lat: [], lng: [] },
+        processing: true,
       };
 
+      setMissions((missions) => [newMission, ...missions]);
       //setSelectedMissionId(missionId);
       let gpsData: any;
       const worker = new Worker("parser.js", { type: "module" });
@@ -76,7 +79,6 @@ function App() {
           event.data.messageType === "GPS"
         ) {
           gpsData = event.data.messageList;
-          console.log("gpsData:", gpsData);
         }
 
         if (event.data.hasOwnProperty("percentage")) {
@@ -97,8 +99,6 @@ function App() {
           //console.log("got files:");
           //console.log(event.data.files);
         } else if (event.data.hasOwnProperty("messagesDoneLoading")) {
-          console.log("[aec] messages finished loading: ", gpsData);
-
           if (gpsData) {
             // Obtener las coordenadas del primer punto para la ubicación
             const firstLat = (gpsData as any).Lat[0] / 10 ** 7;
@@ -106,18 +106,25 @@ function App() {
 
             // Obtener información de ubicación
             getLocationInfo(firstLat, firstLng).then((location) => {
-              setMissions((prevMissions) => [
-                ...prevMissions,
-                {
-                  ...newMission,
-                  trackPoints: {
-                    lat: (gpsData as any).Lat,
-                    lng: (gpsData as any).Lng,
-                    color: newMission.color,
-                  },
-                  location: location,
-                },
-              ]);
+              setMissions((prevMissions) => {
+                const foundMission = prevMissions.find(
+                  (mission) => mission.id === missionId
+                );
+
+                if (!foundMission) {
+                  return prevMissions;
+                }
+
+                foundMission.trackPoints = {
+                  lat: (gpsData as any).Lat,
+                  lng: (gpsData as any).Lng,
+                  color: newMission.color,
+                };
+                foundMission.location = location;
+                foundMission.processing = false;
+
+                return [...prevMissions];
+              });
             });
           }
         }
@@ -174,6 +181,7 @@ function App() {
               color={mission.color}
               trackPoints={mission.trackPoints}
               location={mission.location}
+              processing={mission.processing}
               isSelected={false}
               onSelect={() => {}}
             />

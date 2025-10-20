@@ -44,6 +44,11 @@
   white-space: nowrap;
 }
 
+.loading-icon {
+  color: #666;
+  margin-left: 8px;
+}
+
 .mission-card-info {
   display: flex;
   justify-content: space-between;
