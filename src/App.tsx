@@ -122,11 +122,13 @@ function App() {
 
   const allMarkers = useMemo(
     () =>
-      missions.map((mission) => ({
-        lat: mission.trackPoints.lat[0] / 10 ** 7 || 0,
-        lng: mission.trackPoints.lng[0] / 10 ** 7 || 0,
-        color: mission.color,
-      })),
+      missions
+        .filter((mission) => mission.processing === false)
+        .map((mission) => ({
+          lat: mission.trackPoints.lat[0] / 10 ** 7 || 0,
+          lng: mission.trackPoints.lng[0] / 10 ** 7 || 0,
+          color: mission.color,
+        })),
     [missions]
   );
 

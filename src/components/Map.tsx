@@ -28,6 +28,7 @@ const Map = ({
 
   useEffect(() => {
     if (mapRef.current && !mapInstanceRef.current) {
+      console.log("mapRef.current", mapRef.current);
       const maptilerKey = import.meta.env.VITE_MAPTILER_KEY as
         | string
         | undefined;
@@ -66,6 +67,7 @@ const Map = ({
         style,
         center: [defaultCoords[1], defaultCoords[0]], // [lng, lat]
         zoom: 6,
+        maxZoom: 14,
       });
 
       if (maptilerKey) {
@@ -105,7 +107,7 @@ const Map = ({
         mapInstanceRef.current = null;
       }
     };
-  }, [defaultCoords]);
+  }, []);
 
   // Efecto para manejar los marcadores
   useEffect(() => {
@@ -135,9 +137,41 @@ const Map = ({
     });
 
     if (markers.length > 0) {
-      const bounds = new maplibregl.LngLatBounds();
-      markers.forEach(({ lat, lng }) => bounds.extend([lng, lat]));
-      mapInstanceRef.current.fitBounds(bounds, { padding: 40 });
+      const MAX_FIT_ZOOM = 11;
+      if (markers.length === 1) {
+        const { lat, lng } = markers[0];
+        mapInstanceRef.current.easeTo({
+          center: [lng, lat],
+          zoom: MAX_FIT_ZOOM,
+        });
+      } else {
+        const bounds = new maplibregl.LngLatBounds();
+        markers.forEach(({ lat, lng }) => bounds.extend([lng, lat]));
+
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        const deltaLat = Math.abs(ne.lat - sw.lat);
+        const deltaLng = Math.abs(ne.lng - sw.lng);
+
+        // If markers are extremely close, avoid over-zooming: center and use capped zoom
+        const areVeryClose = deltaLat < 0.01 && deltaLng < 0.01; // ~1km depending on latitude
+        if (areVeryClose) {
+          const avg = markers.reduce(
+            (acc, m) => ({ lat: acc.lat + m.lat, lng: acc.lng + m.lng }),
+            { lat: 0, lng: 0 }
+          );
+          const center = [
+            avg.lng / markers.length,
+            avg.lat / markers.length,
+          ] as [number, number];
+          mapInstanceRef.current.easeTo({ center, zoom: MAX_FIT_ZOOM });
+        } else {
+          mapInstanceRef.current.fitBounds(bounds, {
+            padding: 40,
+            maxZoom: MAX_FIT_ZOOM,
+          });
+        }
+      }
     }
   }, [markers]);
 
