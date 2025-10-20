@@ -45,18 +45,15 @@ function App() {
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      console.log(
-        "Archivo seleccionado:",
-        file.name,
-        "Tamaño:",
-        file.size,
-        "bytes"
-      );
+    const files = event.target.files ? Array.from(event.target.files) : [];
+    if (files.length === 0) {
+      return;
+    }
 
-      const missionId = Date.now().toString();
+    setSelectedFile(files[0]);
+
+    files.forEach((file) => {
+      const missionId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       const missionColor = generateRandomColor();
       const newMission: Mission = {
         id: missionId,
@@ -66,14 +63,13 @@ function App() {
         processing: true,
       };
 
+      // updating state here to show the loading icon in the cards
       setMissions((missions) => [newMission, ...missions]);
-      //setSelectedMissionId(missionId);
+
       let gpsData: any;
       const worker = new Worker("parser.js", { type: "module" });
 
       worker.onmessage = (event) => {
-        console.log("event:", event.data);
-
         if (
           event.data.messageType === "GPS[0]" ||
           event.data.messageType === "GPS"
@@ -81,30 +77,11 @@ function App() {
           gpsData = event.data.messageList;
         }
 
-        if (event.data.hasOwnProperty("percentage")) {
-          //console.log(`percentage: ${event.data.percentage}`);
-        } else if (event.data.hasOwnProperty("availableMessages")) {
-          //console.log("Available message types:");
-          //console.log(event.data.availableMessages);
-        } else if (event.data.hasOwnProperty("metadata")) {
-          //console.log("got metadata:");
-          //console.log(event.data.metadata);
-        } else if (event.data.hasOwnProperty("messages")) {
-          //console.log("got messages");
-          //console.log(event.data.messages);
-        } else if (event.data.hasOwnProperty("messageType")) {
-          //console.log(`got list of ${event.data.messageType}:`);
-          //console.log(event.data.messageList);
-        } else if (event.data.hasOwnProperty("files")) {
-          //console.log("got files:");
-          //console.log(event.data.files);
-        } else if (event.data.hasOwnProperty("messagesDoneLoading")) {
+        if (event.data.hasOwnProperty("messagesDoneLoading")) {
           if (gpsData) {
-            // Obtener las coordenadas del primer punto para la ubicación
             const firstLat = (gpsData as any).Lat[0] / 10 ** 7;
             const firstLng = (gpsData as any).Lng[0] / 10 ** 7;
 
-            // Obtener información de ubicación
             getLocationInfo(firstLat, firstLng).then((location) => {
               setMissions((prevMissions) => {
                 const foundMission = prevMissions.find(
@@ -129,11 +106,10 @@ function App() {
           }
         }
       };
-      let reader = new FileReader();
+
+      const reader = new FileReader();
       reader.onload = function () {
-        let arrayBuffer = new Uint8Array(reader.result as ArrayBuffer);
-        console.log(arrayBuffer);
-        let data = reader.result;
+        const data = reader.result;
         worker.postMessage({
           action: "parse",
           file: data,
@@ -141,7 +117,7 @@ function App() {
       };
 
       reader.readAsArrayBuffer(file);
-    }
+    });
   };
 
   const allMarkers = useMemo(
@@ -167,6 +143,7 @@ function App() {
             type="file"
             id="fileInput"
             accept=".bin"
+            multiple
             onChange={handleFileChange}
             className="file-input"
           />
