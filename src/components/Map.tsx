@@ -1,6 +1,9 @@
 import { useEffect, useRef } from "react";
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+import maplibregl, {
+  Map as MapLibreMap,
+  Marker as MapLibreMarker,
+} from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 
 interface MarkerData {
   lat: number;
@@ -20,29 +23,79 @@ const Map = ({
   className = "",
 }: MapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
-  const mapInstanceRef = useRef<L.Map | null>(null);
-  const markersRef = useRef<L.Marker[]>([]);
+  const mapInstanceRef = useRef<MapLibreMap | null>(null);
+  const markersRef = useRef<MapLibreMarker[]>([]);
 
   useEffect(() => {
     if (mapRef.current && !mapInstanceRef.current) {
-      // Fix para los iconos de Leaflet
-      delete (L.Icon.Default.prototype as any)._getIconUrl;
-      L.Icon.Default.mergeOptions({
-        iconRetinaUrl:
-          "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-        iconUrl:
-          "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-        shadowUrl:
-          "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+      const maptilerKey = import.meta.env.VITE_MAPTILER_KEY as
+        | string
+        | undefined;
+
+      const osm2DStyle: any = {
+        version: 8,
+        sources: {
+          osm: {
+            type: "raster",
+            tiles: [
+              "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
+              "https://b.tile.openstreetmap.org/{z}/{x}/{y}.png",
+              "https://c.tile.openstreetmap.org/{z}/{x}/{y}.png",
+            ],
+            tileSize: 256,
+            attribution: "© OpenStreetMap contributors",
+          },
+        },
+        layers: [
+          {
+            id: "osm",
+            type: "raster",
+            source: "osm",
+            minzoom: 0,
+            maxzoom: 19,
+          },
+        ],
+      };
+
+      const style: any = maptilerKey
+        ? `https://api.maptiler.com/maps/hybrid/style.json?key=${maptilerKey}`
+        : osm2DStyle;
+
+      const map = new maplibregl.Map({
+        container: mapRef.current,
+        style,
+        center: [defaultCoords[1], defaultCoords[0]], // [lng, lat]
+        zoom: 6,
       });
 
-      // Inicializar el mapa
-      const map = L.map(mapRef.current).setView(defaultCoords, 6);
+      if (maptilerKey) {
+        map.on("load", () => {
+          // Add MapTiler Terrain DEM source
+          if (!map.getSource("terrain")) {
+            map.addSource("terrain", {
+              type: "raster-dem",
+              url: `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${maptilerKey}`,
+              tileSize: 256,
+            } as any);
+          }
 
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "© OpenStreetMap contributors",
-      }).addTo(map);
+          // Enable terrain with a slight exaggeration
+          map.setTerrain({ source: "terrain", exaggeration: 1.2 } as any);
 
+          // Add a sky layer for better 3D visualization
+          if (!map.getLayer("sky")) {
+            map.addLayer({
+              id: "sky",
+              type: "sky",
+              paint: {
+                "sky-type": "atmosphere",
+                "sky-atmosphere-sun": [0.0, 0.0],
+                "sky-atmosphere-sun-intensity": 15,
+              },
+            } as any);
+          }
+        });
+      }
       mapInstanceRef.current = map;
     }
 
@@ -60,43 +113,31 @@ const Map = ({
 
     // Limpiar marcadores existentes
     markersRef.current.forEach((marker) => {
-      mapInstanceRef.current?.removeLayer(marker);
+      marker.remove();
     });
-
     markersRef.current = [];
 
     markers.forEach((markerData) => {
       const { lat, lng, color = "blue" } = markerData;
 
-      // Crear icono personalizado con color
-      const customIcon = L.divIcon({
-        className: "custom-marker",
-        html: `<div style="
-          background-color: ${color};
-          width: 20px;
-          height: 20px;
-          border-radius: 50%;
-          border: 2px solid white;
-          box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-        "></div>`,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
-      });
+      const el = document.createElement("div");
+      el.style.backgroundColor = color;
+      el.style.width = "20px";
+      el.style.height = "20px";
+      el.style.borderRadius = "50%";
+      el.style.border = "2px solid white";
+      el.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
 
-      const marker = L.marker([lat, lng], { icon: customIcon }).addTo(
-        mapInstanceRef.current!
-      );
+      const marker = new maplibregl.Marker({ element: el })
+        .setLngLat([lng, lat])
+        .addTo(mapInstanceRef.current!);
       markersRef.current.push(marker);
     });
 
     if (markers.length > 0) {
-      const group = L.featureGroup();
-      markers.forEach((markerData) => {
-        const { lat, lng } = markerData;
-        const marker = L.marker([lat, lng]);
-        group.addLayer(marker);
-      });
-      mapInstanceRef.current.fitBounds(group.getBounds().pad(0.1)); // 10% de padding
+      const bounds = new maplibregl.LngLatBounds();
+      markers.forEach(({ lat, lng }) => bounds.extend([lng, lat]));
+      mapInstanceRef.current.fitBounds(bounds, { padding: 40 });
     }
   }, [markers]);
 
