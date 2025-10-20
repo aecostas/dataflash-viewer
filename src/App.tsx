@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import getLocationInfo from "./services/geolocation";
 import Map from "./components/Map";
 import MissionCard from "./components/MissionCard";
 import "./App.css";
@@ -40,26 +41,6 @@ function App() {
       "#D7BDE2",
     ];
     return colors[Math.floor(Math.random() * colors.length)];
-  };
-
-  // Función para obtener información de ubicación usando Nominatim
-  const getLocationInfo = async (lat: number, lng: number): Promise<string> => {
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=es`
-      );
-      const data = await response.json();
-
-      if (data && data.display_name) {
-        // Extraer información relevante de la respuesta
-        const parts = data.display_name.split(", ");
-        return parts.slice(0, 3).join(", "); // Tomar solo las primeras 3 partes
-      }
-      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-    } catch (error) {
-      console.error("Error obteniendo ubicación:", error);
-      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-    }
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
