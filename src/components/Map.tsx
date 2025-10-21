@@ -30,8 +30,6 @@ const Map = ({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<MapLibreMarker[]>([]);
-  const trackSourceId = useRef<string>("selected-track-source");
-  const trackLayerId = useRef<string>("selected-track-layer");
   const deckOverlayRef = useRef<any>(null);
 
   useEffect(() => {
@@ -221,14 +219,8 @@ const Map = ({
     const map = mapInstanceRef.current;
     if (!map) return;
 
-    // Si no hay track, eliminar capa y fuente si existen
+    // Si no hay track, eliminar overlay Deck.gl si existe
     if (!selectedTrack || selectedTrack.length === 0) {
-      if (map.getLayer(trackLayerId.current)) {
-        map.removeLayer(trackLayerId.current);
-      }
-      if (map.getSource(trackSourceId.current)) {
-        map.removeSource(trackSourceId.current);
-      }
       if (deckOverlayRef.current) {
         try {
           deckOverlayRef.current.setProps({ layers: [] });
@@ -239,48 +231,8 @@ const Map = ({
       return;
     }
 
-    const lineCoords = selectedTrack.map(
-      (p) => [p.lng, p.lat, p.alt] as [number, number, number]
-    ) as [number, number, number][];
-
-    const geojson = {
-      type: "FeatureCollection",
-      features: [
-        {
-          type: "Feature",
-          geometry: {
-            type: "LineString",
-            coordinates: lineCoords,
-          },
-          properties: {},
-        },
-      ],
-    } as any;
-
     const addOrUpdate = () => {
-      if (map.getSource(trackSourceId.current)) {
-        const src = map.getSource(trackSourceId.current) as any;
-        src.setData(geojson);
-      } else {
-        map.addSource(trackSourceId.current, {
-          type: "geojson",
-          data: geojson,
-        } as any);
-      }
-
-      if (!map.getLayer(trackLayerId.current)) {
-        map.addLayer({
-          id: trackLayerId.current,
-          type: "line",
-          source: trackSourceId.current,
-          paint: {
-            "line-color": "#ff5500",
-            "line-width": 3,
-          },
-        } as any);
-      }
-
-      // Añadir overlay Deck.gl con altitud si hay datos de altura
+      // Solo usar Deck.gl para renderizar el track 3D
       const hasAltitude = selectedTrack.some((p) => typeof p.alt === "number");
       const pathLayer = new PathLayer({
         id: "deckgl-selected-track-path",
@@ -310,8 +262,8 @@ const Map = ({
 
       // Ajustar vista a la pista con límite de zoom
       const bounds = new maplibregl.LngLatBounds();
-      lineCoords.forEach(([lng, lat]) =>
-        bounds.extend([lng, lat] as [number, number])
+      selectedTrack.forEach((point) =>
+        bounds.extend([point.lng, point.lat] as [number, number])
       );
       map.fitBounds(bounds, { padding: 40 });
     };
