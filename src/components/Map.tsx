@@ -11,6 +11,7 @@ interface MarkerData {
   lat: number;
   lng: number;
   color?: string;
+  name?: string;
 }
 
 interface MapProps {
@@ -128,17 +129,49 @@ const Map = ({
     markersRef.current = [];
 
     markers.forEach((markerData) => {
-      const { lat, lng, color = "blue" } = markerData;
+      const { lat, lng, color = "blue", name } = markerData;
 
-      const el = document.createElement("div");
-      el.style.backgroundColor = color;
-      el.style.width = "20px";
-      el.style.height = "20px";
-      el.style.borderRadius = "50%";
-      el.style.border = "2px solid white";
-      el.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
+      // Crear contenedor principal para el marcador y el nombre
+      const container = document.createElement("div");
+      container.style.display = "flex";
+      container.style.flexDirection = "column";
+      container.style.alignItems = "center";
+      container.style.position = "relative";
 
-      const marker = new maplibregl.Marker({ element: el })
+      // Crear el marcador circular
+      const markerEl = document.createElement("div");
+      markerEl.style.backgroundColor = color;
+      markerEl.style.width = "20px";
+      markerEl.style.height = "20px";
+      markerEl.style.borderRadius = "50%";
+      markerEl.style.border = "2px solid white";
+      markerEl.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
+      markerEl.style.zIndex = "1";
+
+      container.appendChild(markerEl);
+
+      // Agregar nombre si existe
+      if (name) {
+        const nameEl = document.createElement("div");
+        nameEl.textContent = name;
+        nameEl.style.backgroundColor = "rgba(255, 255, 255, 0.9)";
+        nameEl.style.color = "#333";
+        nameEl.style.padding = "4px 8px";
+        nameEl.style.borderRadius = "4px";
+        nameEl.style.fontSize = "12px";
+        nameEl.style.fontWeight = "500";
+        nameEl.style.whiteSpace = "nowrap";
+        nameEl.style.boxShadow = "0 2px 4px rgba(0,0,0,0.2)";
+        nameEl.style.marginTop = "4px";
+        nameEl.style.border = "1px solid rgba(0,0,0,0.1)";
+        nameEl.style.maxWidth = "150px";
+        nameEl.style.overflow = "hidden";
+        nameEl.style.textOverflow = "ellipsis";
+
+        container.appendChild(nameEl);
+      }
+
+      const marker = new maplibregl.Marker({ element: container })
         .setLngLat([lng, lat])
         .addTo(mapInstanceRef.current!);
       markersRef.current.push(marker);

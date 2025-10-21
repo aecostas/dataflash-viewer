@@ -137,6 +137,7 @@ function App() {
           lat: mission.trackPoints.lat[0] / 10 ** 7 || 0,
           lng: mission.trackPoints.lng[0] / 10 ** 7 || 0,
           color: mission.color,
+          name: mission.fileName,
         })),
     [missions]
   );
