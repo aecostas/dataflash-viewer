@@ -134,7 +134,9 @@ const Map = ({
       container.style.display = "flex";
       container.style.flexDirection = "column";
       container.style.alignItems = "center";
-      container.style.position = "relative";
+      container.style.position = "absolute";
+      container.style.transform = "translate(-50%, -100%)";
+      container.style.pointerEvents = "none";
 
       // Crear el marcador circular
       const markerEl = document.createElement("div");
@@ -144,7 +146,8 @@ const Map = ({
       markerEl.style.borderRadius = "50%";
       markerEl.style.border = "2px solid white";
       markerEl.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
-      markerEl.style.zIndex = "1";
+      markerEl.style.position = "relative";
+      markerEl.style.pointerEvents = "auto";
 
       container.appendChild(markerEl);
 
@@ -165,6 +168,8 @@ const Map = ({
         nameEl.style.maxWidth = "150px";
         nameEl.style.overflow = "hidden";
         nameEl.style.textOverflow = "ellipsis";
+        nameEl.style.position = "relative";
+        nameEl.style.pointerEvents = "auto";
 
         container.appendChild(nameEl);
       }
