@@ -28,12 +28,10 @@ function App() {
   );
 
   const generateRandomColor = (): string => {
-    // Generar valores RGB aleatorios
     const r = Math.floor(Math.random() * 256);
     const g = Math.floor(Math.random() * 256);
     const b = Math.floor(Math.random() * 256);
 
-    // Convertir a hexadecimal
     return `#${r.toString(16).padStart(2, "0")}${g
       .toString(16)
       .padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
@@ -71,6 +69,7 @@ function App() {
 
         if (event.data.hasOwnProperty("messagesDoneLoading")) {
           if (gpsData) {
+            console.log("[aec]gpsData:", gpsData);
             const firstLat = (gpsData as any).Lat[0] / 10 ** 7;
             const firstLng = (gpsData as any).Lng[0] / 10 ** 7;
 
@@ -87,16 +86,12 @@ function App() {
                 foundMission.trackPoints = {
                   lat: (gpsData as any).Lat,
                   lng: (gpsData as any).Lng,
-                  alt:
-                    (gpsData as any).Alt ??
-                    (gpsData as any).AltMSL ??
-                    (gpsData as any).Altitude,
+                  alt: (gpsData as any).RelHomeAlt,
                   color: newMission.color,
                 };
                 foundMission.location = location;
                 foundMission.processing = false;
 
-                console.log("foundMission:", foundMission);
                 return [...prevMissions];
               });
             });
@@ -129,8 +124,6 @@ function App() {
         })),
     [missions]
   );
-
-  console.log("[aec]allMarkers:", missions);
 
   const selectedTrack = useMemo(() => {
     if (!selectedMissionId) return undefined;
