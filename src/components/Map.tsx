@@ -19,6 +19,7 @@ interface MapProps {
   markers?: MarkerData[];
   className?: string;
   selectedTrack?: { lat: number; lng: number; alt?: number }[];
+  onMarkerClick?: (markerData: MarkerData) => void;
 }
 
 const Map = ({
@@ -26,6 +27,7 @@ const Map = ({
   markers = [],
   className = "",
   selectedTrack,
+  onMarkerClick,
 }: MapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<MapLibreMap | null>(null);
@@ -148,6 +150,15 @@ const Map = ({
       markerEl.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
       markerEl.style.position = "relative";
       markerEl.style.pointerEvents = "auto";
+      markerEl.style.cursor = "pointer";
+
+      // Agregar event listener para el click
+      if (onMarkerClick) {
+        markerEl.addEventListener("click", (e) => {
+          e.stopPropagation();
+          onMarkerClick(markerData);
+        });
+      }
 
       container.appendChild(markerEl);
 
@@ -239,9 +250,16 @@ const Map = ({
     const addOrUpdate = () => {
       // Solo usar Deck.gl para renderizar el track 3D
       const hasAltitude = selectedTrack.some((p) => typeof p.alt === "number");
+
+      const adjustedTrack = selectedTrack.map((p) => {
+        const ground = map.queryTerrainElevation([p.lng, p.lat]) || 0;
+        const realAlt = (p.alt || 0) + ground;
+        return { ...p, alt: realAlt };
+      });
+
       const pathLayer = new PathLayer({
         id: "deckgl-selected-track-path",
-        data: hasAltitude ? [selectedTrack] : [],
+        data: hasAltitude ? [adjustedTrack] : [],
         getPath: (d: any) => d.map((p: any) => [p.lng, p.lat, p.alt || 0]),
         getWidth: 4,
         widthUnits: "pixels",

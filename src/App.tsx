@@ -65,10 +65,7 @@ function App() {
       const worker = new Worker("parser.js", { type: "module" });
 
       worker.onmessage = (event) => {
-        if (
-          event.data.messageType === "GPS[0]" ||
-          event.data.messageType === "GPS"
-        ) {
+        if (event.data.messageType === "POS") {
           gpsData = event.data.messageList;
         }
 
@@ -153,6 +150,25 @@ function App() {
     return result;
   }, [missions, selectedMissionId]);
 
+  const handleMarkerClick = (markerData: {
+    lat: number;
+    lng: number;
+    color?: string;
+    name?: string;
+  }) => {
+    // Buscar la misión que corresponde a este marker
+    const mission = missions.find(
+      (m) =>
+        m.fileName === markerData.name &&
+        m.color === markerData.color &&
+        !m.processing
+    );
+
+    if (mission) {
+      setSelectedMissionId(mission.id);
+    }
+  };
+
   return (
     <div className="app">
       <div className="sidepanel">
@@ -191,6 +207,7 @@ function App() {
           markers={allMarkers}
           className="map"
           selectedTrack={selectedTrack}
+          onMarkerClick={handleMarkerClick}
         />
       </div>
     </div>
