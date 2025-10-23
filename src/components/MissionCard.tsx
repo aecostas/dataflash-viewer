@@ -1,4 +1,4 @@
-import type { TrackPointsList } from "../App";
+import type { TrackPointsList } from "../types";
 import "./MissionCard.css";
 
 interface MissionCardProps {

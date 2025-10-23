@@ -84,7 +84,20 @@
   flex-direction: column;
 }
 
-.map {
+.map-container {
   flex: 1;
+  min-height: 0;
+}
+
+.map {
   height: 100%;
+  width: 100%;
+}
+
+.chart-container {
+  height: 300px;
+  padding: 16px;
+  background-color: #fff;
+  border-top: 1px solid #ddd;
+  box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
 }

@@ -2,23 +2,9 @@ import { useMemo, useState } from "react";
 import getLocationInfo from "./services/geolocation";
 import Map from "./components/Map";
 import MissionCard from "./components/MissionCard";
+import AltitudeChart from "./components/AltitudeChart";
+import type { TrackPointsList, Mission } from "./types";
 import "./App.css";
-
-export interface TrackPointsList {
-  lat: number[];
-  lng: number[];
-  color?: string;
-  alt?: number[];
-}
-
-export interface Mission {
-  id: string;
-  fileName: string;
-  color: string;
-  trackPoints: TrackPointsList;
-  location?: string;
-  processing?: boolean;
-}
 
 function App() {
   const [, setSelectedFile] = useState<File | null>(null);
@@ -87,6 +73,7 @@ function App() {
                   lat: (gpsData as any).Lat,
                   lng: (gpsData as any).Lng,
                   alt: (gpsData as any).RelHomeAlt,
+                  time_boot_ms: (gpsData as any).time_boot_ms,
                   color: newMission.color,
                 };
                 foundMission.location = location;
@@ -162,6 +149,15 @@ function App() {
     }
   };
 
+  const selectedMission = useMemo(() => {
+    return missions.find((m) => m.id === selectedMissionId);
+  }, [missions, selectedMissionId]);
+
+  console.log(
+    "[aec]selectedMission.trackPoints:",
+    selectedMission?.trackPoints
+  );
+
   return (
     <div className="app">
       <div className="sidepanel">
@@ -196,12 +192,22 @@ function App() {
         </div>
       </div>
       <div className="main">
-        <Map
-          markers={allMarkers}
-          className="map"
-          selectedTrack={selectedTrack}
-          onMarkerClick={handleMarkerClick}
-        />
+        <div className="map-container">
+          <Map
+            markers={allMarkers}
+            className="map"
+            selectedTrack={selectedTrack}
+            onMarkerClick={handleMarkerClick}
+          />
+        </div>
+        <div className="chart-container">
+          {selectedMission && (
+            <AltitudeChart
+              trackPoints={selectedMission.trackPoints}
+              missionColor={selectedMission.color}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
