@@ -83,11 +83,10 @@ const AltitudeChart: React.FC<AltitudeChartProps> = ({
 
   // Crear datos en formato correcto para ECharts
   const timeData = validTimeData.map((time) => (time - minTime) / 1000); // Convertir a segundos desde el inicio
-  const altitudeData = validAltData.map((altitude) => altitude / 100); // Convertir de cm a metros
 
   // Asegurar que los datos son arrays regulares de JavaScript
   const safeTimeData = [...timeData];
-  const safeAltitudeData = [...altitudeData];
+  const safeAltitudeData = [...validAltData];
 
   const option = {
     title: {

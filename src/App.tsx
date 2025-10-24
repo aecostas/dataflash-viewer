@@ -159,35 +159,29 @@ function App() {
     return missions.find((m) => m.id === selectedMissionId);
   }, [missions, selectedMissionId]);
 
-  console.log(
-    "[aec]selectedMission.trackPoints:",
-    selectedMission?.trackPoints
-  );
-
   const handleMouseOver = (data: {
     time: number;
     altitude: number;
     index: number;
   }) => {
-    console.log("[aec] data: ", data);
-
     if (
-      selectedMission &&
-      selectedMission.trackPoints.lat &&
-      selectedMission.trackPoints.lng
+      !selectedMission ||
+      !selectedMission.trackPoints.lat ||
+      !selectedMission.trackPoints.lng
     ) {
-      const latArray = selectedMission.trackPoints.lat;
-      const lngArray = selectedMission.trackPoints.lng;
+      return;
+    }
+    const latArray = selectedMission.trackPoints.lat;
+    const lngArray = selectedMission.trackPoints.lng;
+    const altArray = selectedMission.trackPoints.alt || [];
+    const length = Math.min(latArray.length, lngArray.length, altArray.length);
 
-      if (
-        data.index >= 0 &&
-        data.index < latArray.length &&
-        data.index < lngArray.length
-      ) {
-        const lat = latArray[data.index] / 10 ** 7;
-        const lng = lngArray[data.index] / 10 ** 7;
-
-        setHoverPosition({ lat, lng, index: data.index });
+    for (let i = 0; i < length; i++) {
+      const lat = latArray[i] / 10 ** 7;
+      const lng = lngArray[i] / 10 ** 7;
+      const alt = altArray[i] || 0;
+      if (alt === data.altitude) {
+        setHoverPosition({ lat, lng, index: i });
       }
     }
   };
