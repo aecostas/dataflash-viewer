@@ -4,7 +4,7 @@ import maplibregl, {
   Marker as MapLibreMarker,
 } from "maplibre-gl";
 import * as DeckMapbox from "@deck.gl/mapbox";
-import { PathLayer } from "@deck.gl/layers";
+import { PathLayer, ScatterplotLayer } from "@deck.gl/layers";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 interface MarkerData {
@@ -19,6 +19,7 @@ interface MapProps {
   markers?: MarkerData[];
   className?: string;
   selectedTrack?: { lat: number; lng: number; alt?: number }[];
+  hoverPosition?: { lat: number; lng: number; index: number } | null;
   onMarkerClick?: (markerData: MarkerData) => void;
 }
 
@@ -27,6 +28,7 @@ const Map = ({
   markers = [],
   className = "",
   selectedTrack,
+  hoverPosition,
   onMarkerClick,
 }: MapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -257,23 +259,53 @@ const Map = ({
         return { ...p, alt: realAlt };
       });
 
-      const pathLayer = new PathLayer({
-        id: "deckgl-selected-track-path",
-        data: hasAltitude ? [adjustedTrack] : [],
-        getPath: (d: any) => d.map((p: any) => [p.lng, p.lat, p.alt || 0]),
-        getWidth: 4,
-        widthUnits: "pixels",
-        getColor: [255, 85, 0, 255],
-        parameters: { depthTest: true },
-      } as any);
+      const layers = [];
+
+      // Crear el layer del track
+      if (hasAltitude) {
+        const pathLayer = new PathLayer({
+          id: "deckgl-selected-track-path",
+          data: [adjustedTrack],
+          getPath: (d: any) => d.map((p: any) => [p.lng, p.lat, p.alt || 0]),
+          getWidth: 4,
+          widthUnits: "pixels",
+          getColor: [255, 85, 0, 255],
+          parameters: { depthTest: true },
+        } as any);
+        layers.push(pathLayer);
+      }
+
+      // Crear el layer de la bolita de hover si hay posición de hover
+      if (
+        hoverPosition &&
+        hasAltitude &&
+        hoverPosition.index < adjustedTrack.length
+      ) {
+        const hoverPoint = adjustedTrack[hoverPosition.index];
+
+        if (hoverPoint) {
+          const hoverLayer = new ScatterplotLayer({
+            id: "deckgl-hover-point",
+            data: [hoverPoint],
+            getPosition: (d: any) => [d.lng, d.lat, d.alt || 0],
+            getRadius: 8,
+            getFillColor: [255, 0, 0, 255],
+            getLineColor: [255, 255, 255, 255],
+            getLineWidth: 3,
+            radiusUnits: "pixels",
+            parameters: { depthTest: true },
+          } as any);
+          layers.push(hoverLayer);
+        }
+      }
 
       const OverlayClass = (DeckMapbox as any).MapboxOverlay;
-      if (hasAltitude) {
+      if (layers.length > 0) {
         if (!deckOverlayRef.current) {
-          deckOverlayRef.current = new OverlayClass({ layers: [pathLayer] });
+          deckOverlayRef.current = new OverlayClass({ layers });
           map.addControl(deckOverlayRef.current);
         } else {
-          deckOverlayRef.current.setProps({ layers: [pathLayer] });
+          deckOverlayRef.current.setProps({ layers });
         }
       } else if (deckOverlayRef.current) {
         try {
@@ -296,7 +328,7 @@ const Map = ({
     } else {
       addOrUpdate();
     }
-  }, [selectedTrack]);
+  }, [selectedTrack, hoverPosition]);
 
   return <div ref={mapRef} className={className} />;
 };

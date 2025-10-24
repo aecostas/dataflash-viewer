@@ -5,16 +5,23 @@ import type { TrackPointsList } from "../types";
 interface AltitudeChartProps {
   trackPoints: TrackPointsList;
   missionColor?: string;
+  onMouseOver?: (data: {
+    time: number;
+    altitude: number;
+    index: number;
+  }) => void;
+  onMouseLeave?: () => void;
 }
 
 const AltitudeChart: React.FC<AltitudeChartProps> = ({
   trackPoints,
   missionColor = "#ff5500",
+  onMouseOver,
+  onMouseLeave,
 }) => {
   const chartRef = useRef<ReactECharts>(null);
   const { alt, time_boot_ms } = trackPoints;
 
-  // Limpiar el componente cuando se desmonte
   useEffect(() => {
     return () => {
       if (chartRef.current) {
@@ -172,6 +179,21 @@ const AltitudeChart: React.FC<AltitudeChartProps> = ({
         style={{ height: "100%", width: "100%" }}
         opts={{ renderer: "canvas" }}
         notMerge={true}
+        onEvents={{
+          showTip: (params: any) => {
+            if (onMouseOver && params.dataIndex !== undefined) {
+              const index = params.dataIndex;
+              const time = safeTimeData[index];
+              const altitude = safeAltitudeData[index];
+              onMouseOver({ time, altitude, index });
+            }
+          },
+          mouseout: () => {
+            if (onMouseLeave) {
+              onMouseLeave();
+            }
+          },
+        }}
       />
     </div>
   );

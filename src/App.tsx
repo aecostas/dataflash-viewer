@@ -3,7 +3,8 @@ import getLocationInfo from "./services/geolocation";
 import Map from "./components/Map";
 import MissionCard from "./components/MissionCard";
 import AltitudeChart from "./components/AltitudeChart";
-import type { TrackPointsList, Mission } from "./types";
+import type { Mission } from "./types";
+
 import "./App.css";
 
 function App() {
@@ -12,6 +13,11 @@ function App() {
   const [selectedMissionId, setSelectedMissionId] = useState<string | null>(
     null
   );
+  const [hoverPosition, setHoverPosition] = useState<{
+    lat: number;
+    lng: number;
+    index: number;
+  } | null>(null);
 
   const generateRandomColor = (): string => {
     const r = Math.floor(Math.random() * 256);
@@ -158,6 +164,38 @@ function App() {
     selectedMission?.trackPoints
   );
 
+  const handleMouseOver = (data: {
+    time: number;
+    altitude: number;
+    index: number;
+  }) => {
+    console.log("[aec] data: ", data);
+
+    if (
+      selectedMission &&
+      selectedMission.trackPoints.lat &&
+      selectedMission.trackPoints.lng
+    ) {
+      const latArray = selectedMission.trackPoints.lat;
+      const lngArray = selectedMission.trackPoints.lng;
+
+      if (
+        data.index >= 0 &&
+        data.index < latArray.length &&
+        data.index < lngArray.length
+      ) {
+        const lat = latArray[data.index] / 10 ** 7;
+        const lng = lngArray[data.index] / 10 ** 7;
+
+        setHoverPosition({ lat, lng, index: data.index });
+      }
+    }
+  };
+
+  const handleMouseLeave = () => {
+    setHoverPosition(null);
+  };
+
   return (
     <div className="app">
       <div className="sidepanel">
@@ -197,6 +235,7 @@ function App() {
             markers={allMarkers}
             className="map"
             selectedTrack={selectedTrack}
+            hoverPosition={hoverPosition}
             onMarkerClick={handleMarkerClick}
           />
         </div>
@@ -205,6 +244,8 @@ function App() {
             <AltitudeChart
               trackPoints={selectedMission.trackPoints}
               missionColor={selectedMission.color}
+              onMouseOver={handleMouseOver}
+              onMouseLeave={handleMouseLeave}
             />
           )}
         </div>
